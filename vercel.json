@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "headers": [
+    {
+      "source": "/manifest.json",
+      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
+    },
+    {
+      "source": "/service-worker.js",
+      "headers": [{ "key": "Service-Worker-Allowed", "value": "/" }]
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/staff-:name", "destination": "/api/staff?a=:name" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

@@ -1,0 +1,44 @@
+rules_version = '2';
+// Paste into Firebase console > Firestore Database > Rules, then Publish.
+// Key idea: a signed-in user may edit their own data, but NEVER the fields that grant access or money
+// (role, comped, grant, subscription, crm, stripeCustomerId...). Those are written only by the server.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function protectedKeys() {
+      return ['role', 'comped', 'grant', 'subscription', 'crm', 'stripeCustomerId', 'createdByAdmin', 'roleRemovedAt'];
+    }
+
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+                    && !request.resource.data.keys().hasAny(protectedKeys());
+      allow update: if request.auth != null && request.auth.uid == uid
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(protectedKeys());
+      allow delete: if false;
+
+      // In-app messages from staff: the customer can read them and mark them read, nothing else.
+      match /messages/{m} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow update: if request.auth != null && request.auth.uid == uid
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+        allow create, delete: if false;
+      }
+
+      // Everything else under the user (meta, applications, analyses, files index...): the owner only.
+      match /{sub}/{doc=**} {
+        allow read, write: if request.auth != null && request.auth.uid == uid && sub != 'messages';
+      }
+    }
+
+    // Contact form on the landing page: anyone may send a message, nobody may read from the browser.
+    match /contactMessages/{d} { allow create: if true; allow read, update, delete: if false; }
+
+    // Server-only collections (the Admin SDK bypasses these rules).
+    match /hr_employees/{d} { allow read, write: if false; }
+    match /hr_tasks/{d}     { allow read, write: if false; }
+    match /usageCounters/{d} { allow read, write: if false; }
+    match /mailAccounts/{d}  { allow read, write: if false; }
+    match /errorLogs/{d}     { allow read, write: if false; }
+  }
+}
